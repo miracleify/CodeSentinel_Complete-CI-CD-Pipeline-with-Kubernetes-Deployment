@@ -1,0 +1,50 @@
+name: CI/CD to EKS with Helm
+
+on:
+  push:
+    branches: [ "main" ]  # change if you use "master" or "develop"
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 3. Login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4. Build & push Docker image
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: simple-node-app
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # 5. Update kubeconfig for EKS
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+
+      # 6. Deploy with Helm
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install simple-node-app ./helm \
+            --namespace ${{ secrets.K8S_NAMESPACE }} --create-namespace \
+            --set image.repository=${{ steps.login-ecr.outputs.registry }}/simple-node-app \
+            --set image.tag=${{ github.sha }}

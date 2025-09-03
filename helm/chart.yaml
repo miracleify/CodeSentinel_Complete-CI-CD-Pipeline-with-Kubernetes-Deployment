@@ -1,0 +1,5 @@
+apiVersion: v2
+name: simple-node-app
+description: A simple Node.js app deployed with Helm on EKS
+version: 0.1.0
+appVersion: "1.0.0"
