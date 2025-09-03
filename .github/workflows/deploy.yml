@@ -2,18 +2,18 @@ name: CI/CD to EKS with Helm
 
 on:
   push:
-    branches: [ "main" ]  # change if you use "master" or "develop"
+    branches: [ "main" ]  # Trigger workflow on push to main branch
 
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
+      # 1. Checkout the repository code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Configure AWS credentials
+      # 2. Configure AWS credentials to allow ECR & EKS access
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -21,38 +21,37 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 3. Login to Amazon ECR
+      # 3. Log in to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4. Build & push Docker image
+      # 4. Build Docker image from project root and push to ECR
       - name: Build and push Docker image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: simple-node-app
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}  # ECR registry URL
+          ECR_REPOSITORY: simple-node-app                      # ECR repository name
+          IMAGE_TAG: ${{ github.sha }}                         # Use Git SHA as image tag
         run: |
-          # Build Docker image
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          # Push Docker image to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 5. Update kubeconfig for EKS
+      # 5. Update kubeconfig to allow kubectl to connect to EKS
       - name: Update kubeconfig
         run: |
-          # Configure kubectl to use your EKS cluster
           aws eks update-kubeconfig --name ${{ secrets.CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
-      # 6. Deploy with Helm
+      # 6. Deploy or upgrade Helm release
       - name: Deploy with Helm
         run: |
-          # Upgrade or install Helm release
+          # Helm looks for Chart.yaml inside ./helm folder
+          # Helm release name: simple-node-app
+          # Namespace: provided via secret K8S_NAMESPACE, will be created if it doesn't exist
           helm upgrade --install simple-node-app ./helm \
             --namespace ${{ secrets.K8S_NAMESPACE }} --create-namespace \
             --set image.repository=${{ steps.login-ecr.outputs.registry }}/simple-node-app \
             --set image.tag=${{ github.sha }}
-          # Optional: show deployed resources for confirmation
-          kubectl get pods -n ${{ secrets.K8S_NAMESPACE }}
-          kubectl get svc -n ${{ secrets.K8S_NAMESPACE }}
-          kubectl get ingress -n ${{ secrets.K8S_NAMESPACE }}
+
+      # 7. Optional: Verify deployment
+      - name: Check Pods
+        run: kubectl get pods --namespace ${{ secrets.K8S_NAMESPACE }}
