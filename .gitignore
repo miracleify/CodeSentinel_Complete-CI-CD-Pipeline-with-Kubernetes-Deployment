@@ -1,0 +1,43 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# AWS CLI / Credentials
+*.pem
+*.key
+
+# Local Kubernetes config
+.kube/
+
+# Node / NPM (if you have frontend/backend code)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python (if any scripts)
+__pycache__/
+*.pyc
+
+# IDE / OS
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Docker
+*.tar
+docker-compose.override.yml
+
+# Helm
+helm/charts/
+helm/tmp/
+
+# Logs
+*.log
