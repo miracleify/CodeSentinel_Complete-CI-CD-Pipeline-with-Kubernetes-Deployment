@@ -33,18 +33,26 @@ jobs:
           ECR_REPOSITORY: simple-node-app
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          # Build Docker image
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          # Push Docker image to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       # 5. Update kubeconfig for EKS
       - name: Update kubeconfig
         run: |
+          # Configure kubectl to use your EKS cluster
           aws eks update-kubeconfig --name ${{ secrets.CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
       # 6. Deploy with Helm
       - name: Deploy with Helm
         run: |
+          # Upgrade or install Helm release
           helm upgrade --install simple-node-app ./helm \
             --namespace ${{ secrets.K8S_NAMESPACE }} --create-namespace \
             --set image.repository=${{ steps.login-ecr.outputs.registry }}/simple-node-app \
             --set image.tag=${{ github.sha }}
+          # Optional: show deployed resources for confirmation
+          kubectl get pods -n ${{ secrets.K8S_NAMESPACE }}
+          kubectl get svc -n ${{ secrets.K8S_NAMESPACE }}
+          kubectl get ingress -n ${{ secrets.K8S_NAMESPACE }}
